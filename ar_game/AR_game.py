@@ -83,6 +83,25 @@ for row in range(rows):
         )
         bricks.append(brick)
 
+#Reset button on end screen
+reset_button = shapes.Rectangle(
+    width//2 - 100,
+    height//2 - 75,
+    200,
+    50,
+    color=(50, 150, 50)
+)
+
+reset_label = pyglet.text.Label(
+    "Play Again",
+    font_name='Pixel Game',
+    font_size=20,
+    x=width//2,
+    y=height//2 - 50,
+    anchor_x="center",
+    anchor_y="center"
+)
+
 # converts OpenCV image to PIL image and then to pyglet texture
 # https://gist.github.com/nkymut/1cb40ea6ae4de0cf9ded7332f1ca0d55
 def cv2glet(img,fmt):
@@ -137,6 +156,49 @@ def get_tip(contour):
     tip = points[np.argmin(points[:, 1])]
 
     return tuple(tip)
+
+
+#reset game to start parameters
+def reset_game():
+    global end, score, ball, ball_vx, ball_vy, bricks, rows, cols, brick_width, brick_height
+
+    end = False
+    score = 0
+
+    ball.x = width // 2
+    ball.y = height // 2
+
+    ball_vx = 8
+    ball_vy = 8
+
+    bricks = []
+
+    for row in range(rows):
+        for col in range(cols):
+            brick = shapes.Rectangle(
+                brick_width + col * (brick_width + 1/3 * brick_width),
+                height - 2 * brick_height - row * (brick_height + 1/3 * brick_width),
+                brick_width,
+                brick_height,
+                color=(
+                    random.randint(100, 255),
+                    random.randint(100, 255),
+                    random.randint(100, 255),
+                )
+            )
+            bricks.append(brick)
+
+    end = False
+
+#reset game when reset button is pressed
+@win.event
+def on_mouse_press(x, y, button, modifiers):
+    if not end:
+        return
+
+    if (reset_button.x <= x <= reset_button.x + reset_button.width
+        and reset_button.y <= y <= reset_button.y + reset_button.height):
+        reset_game()
 
 
 
@@ -234,10 +296,8 @@ def on_draw():
                         hit_brick = None
 
                         for brick in bricks:
-                            if (
-                                brick.x <= ball.x <= brick.x + brick.width
-                                and brick.y <= ball.y <= brick.y + brick.height
-                            ):
+                            if (brick.x <= ball.x <= brick.x + brick.width
+                                and brick.y <= ball.y <= brick.y + brick.height):
                                 hit_brick = brick
                                 score += 1
                                 break
@@ -282,9 +342,11 @@ def on_draw():
                             font_name='Pixel Game',
                             font_size=36,
                             x=width/2,
-                            y=height/2,
+                            y=height/2 + 50,
                             anchor_x = "center",
                             anchor_y = "center")
         label_end.draw()
+        reset_button.draw()
+        reset_label.draw()
 
 pyglet.app.run()
