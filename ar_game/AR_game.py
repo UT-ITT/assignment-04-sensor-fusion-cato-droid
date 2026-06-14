@@ -6,6 +6,7 @@ import pyglet
 from pyglet import window, shapes
 from PIL import Image
 import sys
+import random
 
 video_id = 0
 
@@ -17,6 +18,8 @@ aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 aruco_params = aruco.DetectorParameters()
 detector = aruco.ArucoDetector(aruco_dict, aruco_params)
 
+markers_detected = False
+
 # Create a video capture object for the webcam
 cap = cv2.VideoCapture(video_id)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -24,8 +27,48 @@ height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 win = window.Window(width, height, caption="Cool Video Game")
 
-#FIXME circle for tip of finger, starts in left bottom corner before finger is detected
-circle = shapes.Circle(0, 0, radius = 10, color = (255, 0, 0))
+#shapes for the game
+paddle_width = max(width/10, 20)
+paddle_height = max(height/40, 5)
+
+paddle = shapes.Rectangle(width//2 - paddle_width//2,
+                          paddle_height,
+                          paddle_width,
+                          paddle_height,
+                          color = (0, 255, 0))
+
+ball_radius = paddle_width/4
+
+ball = shapes.Circle(width//2, 
+                     height//2,
+                     ball_radius,
+                     color=(255, 0, 0))
+
+ball_vx = 100
+ball_vy = 100
+
+bricks = []
+
+rows = 5
+cols = 10
+
+brick_width = width / 15
+brick_height = paddle_height
+
+for row in range(rows):
+    for col in range(cols):
+        brick = shapes.Rectangle(
+            brick_width + col * (brick_width + 1/3 * brick_width),
+            height - 2 * brick_height - row * (brick_height + 1/3 * brick_width),
+            brick_width,
+            brick_height,
+            color=(
+                random.randint(100, 255),
+                random.randint(100, 255),
+                random.randint(100, 255),
+            )
+        )
+        bricks.append(brick)
 
 # converts OpenCV image to PIL image and then to pyglet texture
 # https://gist.github.com/nkymut/1cb40ea6ae4de0cf9ded7332f1ca0d55
@@ -86,7 +129,8 @@ def get_tip(contour):
 
 @win.event
 def on_draw():
-    #global width, height
+    global markers_detected
+
     # Capture a frame from the webcam
     ret, frame = cap.read()
 
@@ -105,6 +149,7 @@ def on_draw():
             aruco.drawDetectedMarkers(frame, corners)
             #start transformation if all 4 markers are successfully captured
             if len(ids) == 4:
+                markers_detected = True
                 points = [[0,0], [0,0], [0,0], [0,0]]
                 #order marker points to put the correct corner values in points for the transition to work
                 for i in range (len(ids)):
@@ -129,16 +174,28 @@ def on_draw():
                 #finger detection
                 mask = get_mask(frame)
                 contour = get_object_contour(mask)
-                tip = get_tip(contour)
-                print(f"tip: {tip}")
-                x,y = tip
-                circle.x = x
-                circle.y = height - y
+                if contour is not None:
+                    tip = get_tip(contour)
+                    x,y = tip
+
+                    #game mechanics
+                    paddle.x = x - paddle_width/2
+                    paddle.x = max(0, min(width - paddle_width, paddle.x))
+
+            else:
+                markers_detected = False
+
+
 
         # Display the frame
         win.clear()
         img = cv2glet(frame, 'BGR')
         img.blit(0, 0, 0)
-        circle.draw()
+
+        if markers_detected:
+            paddle.draw()
+            ball.draw()
+            for brick in bricks:
+                brick.draw()
 
 pyglet.app.run()
