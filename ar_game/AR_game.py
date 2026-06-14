@@ -17,6 +17,15 @@ aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 aruco_params = aruco.DetectorParameters()
 detector = aruco.ArucoDetector(aruco_dict, aruco_params)
 
+# Create a video capture object for the webcam
+cap = cv2.VideoCapture(video_id)
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+win = window.Window(width, height, caption="Cool Video Game")
+
+#FIXME circle for tip of finger, starts in left bottom corner before finger is detected
+circle = shapes.Circle(0, 0, radius = 10, color = (255, 0, 0))
 
 # converts OpenCV image to PIL image and then to pyglet texture
 # https://gist.github.com/nkymut/1cb40ea6ae4de0cf9ded7332f1ca0d55
@@ -39,12 +48,41 @@ def cv2glet(img,fmt):
                                    pitch=top_to_bottom_flag*bytes_per_row)
     return pyimg
 
-# Create a video capture object for the webcam
-cap = cv2.VideoCapture(video_id)
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#get mask for objects in the foreground, assuming the background is close to white
+def get_mask(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-win = window.Window(width, height, caption="Cool Video Game")
+    _, mask = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+    #remove noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    return mask
+
+#extract contour of object from background with mask
+def get_object_contour(mask):
+    contours, _ = cv2.findContours(
+        mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    if not contours:
+        return None
+
+    return max(contours, key=cv2.contourArea)
+
+#get position of tip (smallest y value)
+def get_tip(contour):
+    points = contour[:, 0, :]
+
+    tip = points[np.argmin(points[:, 1])]
+
+    return tuple(tip)
+
+
 
 @win.event
 def on_draw():
@@ -88,9 +126,19 @@ def on_draw():
                 M = cv2.getPerspectiveTransform(points, points_2)
                 frame = cv2.warpPerspective(frame, M, (width, height))
 
+                #finger detection
+                mask = get_mask(frame)
+                contour = get_object_contour(mask)
+                tip = get_tip(contour)
+                print(f"tip: {tip}")
+                x,y = tip
+                circle.x = x
+                circle.y = height - y
+
         # Display the frame
         win.clear()
         img = cv2glet(frame, 'BGR')
         img.blit(0, 0, 0)
+        circle.draw()
 
 pyglet.app.run()
