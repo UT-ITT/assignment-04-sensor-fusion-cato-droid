@@ -23,9 +23,9 @@ points = [[0,0], [0,0], [0,0], [0,0]]
 def mouse_callback(event, x, y, flags, param):
     global img, counter, points
 
-    if event == cv2.EVENT_LBUTTONDOWN and counter <= 4:
+    if event == cv2.EVENT_LBUTTONDOWN and counter < 4:
         img = cv2.circle(img, (x, y), 5, (255, 0, 150), -1)
-        points[counter] = [x,y] #FIXME for some reason we sometimes get an out of bounds error here, even thoughI check the counter avobe 
+        points[counter] = [x,y]
         cv2.imshow(WINDOW_NAME, img)
         counter += 1
         if counter == 4:
