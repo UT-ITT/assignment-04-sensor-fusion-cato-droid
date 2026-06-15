@@ -3,10 +3,22 @@ import cv2.aruco as aruco
 import sys
 import numpy as np
 import pyglet
-from pyglet import window, shapes
+from pyglet import window, shapes, clock
 from PIL import Image
 import sys
+import time
+from DIPPID import SensorUDP
 
+#TODO
+#different alpha values
+#alpha values adjustable with arrow keys
+#test update functions
+
+#DIPPID parameters
+port = 5700
+sensor = SensorUDP(port)
+
+#video source
 video_id = 0
 
 if len(sys.argv) > 1:
@@ -23,12 +35,28 @@ width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 win = window.Window(width, height, caption="Sensor Fusion")
 
+#global variables for dot movement
+acceleration_x = 0
+acceleration_y = 0
+velocity_x = 0
+velocity_y = 0
+position_x = 0
+position_y = 0
+update_rate = 0.01
+scalar = 10000
+
 #red dot to track the aruco marker with ID 5
 tracker_radius = width // 30
 tracker = shapes.Circle(0, 
                         0,
                         tracker_radius,
                         color=(255, 0, 0))
+
+#green dot for position prediction
+prediction = shapes.Circle(0,
+                           0,
+                           tracker_radius,
+                           color=(0, 255, 0))
 
 # converts OpenCV image to PIL image and then to pyglet texture
 # https://gist.github.com/nkymut/1cb40ea6ae4de0cf9ded7332f1ca0d55
@@ -49,9 +77,42 @@ def cv2glet(img,fmt):
                                    pitch=top_to_bottom_flag*bytes_per_row)
     return pyimg
 
+def update_sensor(data):
+    global acceleration_x, acceleration_y
+    acceleration_x = data['x'] * -1
+    acceleration_y = data['y'] * -1
+
+def update_prediction(dt):
+    # dt <- actual elapsed time since the last call
+    global sensor, velocity_x, velocity_y, acceleration_x, acceleration_y, position_x, position_y, scalar, prediction, win
+    
+    #reset prediction when button 1 is pressed
+    if sensor.get_value("button_1") == 1:
+        reset_prediction()
+    
+    # Euler integration <- acceleration is assumed constant during this short time interval
+    velocity_x = acceleration_x * dt * scalar
+    velocity_y = acceleration_y * dt * scalar
+    position_x = tracker.x - velocity_x * dt
+    position_y = tracker.y - velocity_y * dt
+    #FIXME why is the position lagging behind and not in front of the tracker? Sign change has no effect
+    #print(acceleration, velocity, position_x)
+    prediction.x = int(position_x)
+    prediction.y = int(position_y)
+
+def reset_prediction():
+    global velocity_x, velocity_y, acceleration_x, acceleration_y, position_x, position_y, prediction, tracker
+    velocity_x = 0
+    velocity_y = 0
+    acceleration_x = 0
+    acceleration_y = 0
+    position_x = tracker.x
+    position_y = tracker.y
+    prediction.x = position_x
+    prediction.y = position_y
+
 @win.event
 def on_draw():
-    #global width, height
     # Capture a frame from the webcam
     ret, frame = cap.read()
     if ret:
@@ -105,5 +166,12 @@ def on_draw():
         img = cv2glet(frame, 'BGR')
         img.blit(0, 0, 0)
         tracker.draw()
+        prediction.draw()
+
+while 'accelerometer' not in sensor.get_capabilities():
+    time.sleep(0.1)
+
+sensor.register_callback('accelerometer', update_sensor)
+clock.schedule_interval(update_prediction, update_rate)
 
 pyglet.app.run()
