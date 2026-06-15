@@ -4,15 +4,13 @@ import sys
 import numpy as np
 import pyglet
 from pyglet import window, shapes, clock
+from pyglet.window import key
 from PIL import Image
 import sys
 import time
 from DIPPID import SensorUDP
 
-#TODO
-#different alpha values
-#alpha values adjustable with arrow keys
-#test update functions
+#NOTE: does not work quite as intended for me, but I could not figure out why in time for the submission. See notes in README)
 
 #DIPPID parameters
 port = 5700
@@ -43,7 +41,10 @@ velocity_y = 0
 position_x = 0
 position_y = 0
 update_rate = 0.01
-scalar = 10000
+#FIXME higher scalar possible for static velocity calculation
+#scalar = 10
+scalar = 1000
+alpha = 0.5
 
 #red dot to track the aruco marker with ID 5
 tracker_radius = width // 30
@@ -84,19 +85,21 @@ def update_sensor(data):
 
 def update_prediction(dt):
     # dt <- actual elapsed time since the last call
-    global sensor, velocity_x, velocity_y, acceleration_x, acceleration_y, position_x, position_y, scalar, prediction, win
+    global sensor, velocity_x, velocity_y, acceleration_x, acceleration_y, position_x, position_y, scalar, prediction, win, alpha
     
     #reset prediction when button 1 is pressed
     if sensor.get_value("button_1") == 1:
         reset_prediction()
     
     # Euler integration <- acceleration is assumed constant during this short time interval
-    velocity_x = acceleration_x * dt * scalar
-    velocity_y = acceleration_y * dt * scalar
-    position_x = tracker.x - velocity_x * dt
-    position_y = tracker.y - velocity_y * dt
-    #FIXME why is the position lagging behind and not in front of the tracker? Sign change has no effect
-    #print(acceleration, velocity, position_x)
+    #FIXME velocity continuously vs staticly calculated
+    # velocity_x += acceleration_x * dt
+    # velocity_y += acceleration_y * dt
+    velocity_x = acceleration_x * dt
+    velocity_y = acceleration_y * dt
+    position_x = (tracker.x - velocity_x * scalar) * alpha + tracker.x * (1-alpha) 
+    position_y = (tracker.y - velocity_y * scalar) * alpha + tracker.y * (1-alpha) 
+    print(f"velocity x:{velocity_x} y: {velocity_y}")
     prediction.x = int(position_x)
     prediction.y = int(position_y)
 
@@ -110,6 +113,15 @@ def reset_prediction():
     position_y = tracker.y
     prediction.x = position_x
     prediction.y = position_y
+
+@win.event
+def on_key_press(symbol, modifiers):
+    global alpha
+
+    if symbol == key.UP or symbol == key.RIGHT:
+        alpha = min(1, round(alpha + 0.1, 2))
+    if symbol == key.DOWN or symbol == key.LEFT:
+        alpha = max(0, round(alpha - 0.1, 2))
 
 @win.event
 def on_draw():
@@ -167,6 +179,8 @@ def on_draw():
         img.blit(0, 0, 0)
         tracker.draw()
         prediction.draw()
+        label = pyglet.text.Label(f'Alpha: {alpha}', font_size=20, color = (0, 0, 0), x=10, y=10)
+        label.draw()
 
 while 'accelerometer' not in sensor.get_capabilities():
     time.sleep(0.1)
