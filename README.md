@@ -20,7 +20,7 @@ call paramters: input path, output path, result resolution value 1, result resol
 - hold the board with the aruco markers out in front of you so the markers 1 and 3 are at the top and facing the camera.
 (if you are not sure which markers are 1 and 3, check out this website: https://chev.me/arucogen/ (look at 6x6 and the desired ID))
 - make sure all 4 markers are in the camera frame, so they can get recognized. Once they are, you can see the transformed rectangle
-- move marker 5 in the region between the other markers. You can now see the tracker tracking the marker (red) and the prediction based on the accelerometer data (green)
+- move your phone with marker 5 in the region between the other markers. You can now see the tracker tracking the marker (red) and the prediction based on the accelerometer data (green)
 - To adjust the alpha value, use the arrow keys: up/right: increase alpha by 0.1 (until 1), down/left: decrease alpha by 0.1 (until 0)
 - to reset the prediction to the tracker position, press button 1 in your DIPPID app
 
